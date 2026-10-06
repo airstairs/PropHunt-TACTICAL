@@ -87,6 +87,10 @@
       height: 14px;
       pointer-events: none;
       z-index: 10;
+      transition: opacity 0.15s ease;
+    }
+    #crosshair.hidden {
+      opacity: 0;
     }
     #crosshair::before, #crosshair::after {
       content: '';
@@ -96,6 +100,38 @@
     }
     #crosshair::before { top: 6px; left: 0; width: 14px; height: 2px; }
     #crosshair::after { top: 0; left: 6px; width: 2px; height: 14px; }
+
+    /* Red Dot ADS Reflex Sight Reticle */
+    #ads-reflex-reticle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 50px;
+      height: 50px;
+      border: 2px solid rgba(0, 255, 200, 0.35);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 12;
+      opacity: 0;
+      transition: opacity 0.12s ease-in-out;
+      box-shadow: inset 0 0 10px rgba(0, 255, 200, 0.2);
+    }
+    #ads-reflex-reticle.active {
+      opacity: 1;
+    }
+    #ads-reflex-reticle::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 6px;
+      height: 6px;
+      background: #ff0000;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #ff0000, 0 0 12px #ff2222;
+    }
     
     #hitmarker {
       position: absolute;
@@ -409,6 +445,7 @@
 
   <!-- HUD Overlay Elements -->
   <div id="crosshair"></div>
+  <div id="ads-reflex-reticle"></div>
   <div id="hitmarker">
     <div class="hm-line tl"></div>
     <div class="hm-line tr"></div>
@@ -533,6 +570,21 @@
         osc.start(now);
         osc.stop(now + 0.15);
       },
+      playImpactSound() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.06);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.06);
+      },
       playSkeetShatter() {
         if (!this.ctx) return;
         const now = this.ctx.currentTime;
@@ -557,20 +609,24 @@
         clipSize: 30,
         maxReserve: 90,
         fireRate: 110,
-        hipPos: new THREE.Vector3(0.22, -0.22, -0.45),
-        adsPos: new THREE.Vector3(0.0, -0.145, -0.32),
+        hipPos: new THREE.Vector3(0.20, -0.20, -0.42),
+        // Aligned perfectly with the rifle's mounted red dot reflex sight housing
+        adsPos: new THREE.Vector3(0.0, -0.165, -0.25),
         recoilP: 0.04, recoilY: 0.015,
-        haptic: [20]
+        haptic: [20],
+        adsFov: 42 // Optical zoom through red dot
       },
       PISTOL: {
         name: "PISTOL",
         clipSize: 12,
         maxReserve: 36,
         fireRate: 220,
-        hipPos: new THREE.Vector3(0.18, -0.20, -0.38),
-        adsPos: new THREE.Vector3(0.0, -0.13, -0.28),
+        hipPos: new THREE.Vector3(0.16, -0.18, -0.36),
+        // Aligned perfectly with the pistol's mounted slide red dot reflex sight
+        adsPos: new THREE.Vector3(0.0, -0.132, -0.21),
         recoilP: 0.08, recoilY: 0.025,
-        haptic: [35, 10, 20]
+        haptic: [35, 10, 20],
+        adsFov: 55 // Standard optical reflex zoom for pistol
       }
     };
 
@@ -589,6 +645,7 @@
     let playerRadius = 0.5;
     let playerYaw = 0, playerPitch = 0;
     let isADS = false;
+    let currentFov = 65;
     let isFiring = false;
     let lastFireTime = 0;
     let isReloading = false;
@@ -628,6 +685,7 @@
     const clayPool = [];
     const shardPool = [];
     const dustPool = [];
+    const sparkPool = [];
     const ammoCratePool = [];
 
     // Raycasting & Hit Detection
@@ -790,83 +848,142 @@
       });
     }
 
-    /* --- VIEWMODELS, WEAPONS & MOUNTED FLASHLIGHTS --- */
+    /* --- DETAILED TACTICAL VIEWMODELS WITH RED DOT SIGHTS --- */
     function setupWeaponViewmodels() {
       viewmodelGroup = new THREE.Group();
       camera.add(viewmodelGroup);
       scene.add(camera);
 
-      const darkMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5 });
-      const metallicMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8, roughness: 0.3 });
+      const darkMetal = new THREE.MeshStandardMaterial({ color: 0x181818, metalness: 0.85, roughness: 0.25 });
+      const gunGrey = new THREE.MeshStandardMaterial({ color: 0x2c2c2c, metalness: 0.7, roughness: 0.35 });
+      const polymerMat = new THREE.MeshStandardMaterial({ color: 0x121212, roughness: 0.75 });
+      const brassMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.9, roughness: 0.2 });
+      const redDotMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
 
-      // --- RIFLE ---
+      // --- ASSAULT RIFLE WITH RED DOT SIGHT ---
       rifleMesh = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.1, 0.5), darkMat);
-      rifleMesh.add(body);
 
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.35, 8), darkMat);
-      barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0, 0.02, -0.38);
-      rifleMesh.add(barrel);
+      const rBody = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.085, 0.38), darkMetal);
+      rBody.position.set(0, 0, -0.05);
+      rifleMesh.add(rBody);
 
-      const sightMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-      const frontSight = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.025, 0.006), sightMat);
-      frontSight.position.set(0, 0.062, -0.42);
-      rifleMesh.add(frontSight);
+      const rRail = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.02, 0.42), gunGrey);
+      rRail.position.set(0, 0.052, -0.06);
+      rifleMesh.add(rRail);
 
-      const mag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.16, 0.06), darkMat);
-      mag.position.set(0, -0.1, -0.05);
-      mag.rotation.x = 0.2;
-      rifleMesh.add(mag);
+      // Rifle Red Dot Reflex Sight (Mounted on Top Rail)
+      const rSightHousing = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.035, 0.04), darkMetal);
+      rSightHousing.position.set(0, 0.082, -0.12);
+      rifleMesh.add(rSightHousing);
+      const rDotEmitter = new THREE.Mesh(new THREE.SphereGeometry(0.0035, 8, 8), redDotMat);
+      rDotEmitter.position.set(0, 0.082, -0.12);
+      rifleMesh.add(rDotEmitter);
 
-      // Mounted Rifle Tactical Flashlight (Outside Side Rail)
+      const rHandguard = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.03, 0.28, 12), polymerMat);
+      rHandguard.rotation.x = Math.PI / 2;
+      rHandguard.position.set(0, 0.01, -0.26);
+      rifleMesh.add(rHandguard);
+
+      const rBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.32, 10), darkMetal);
+      rBarrel.rotation.x = Math.PI / 2;
+      rBarrel.position.set(0, 0.01, -0.38);
+      rifleMesh.add(rBarrel);
+
+      const rMuzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.08, 10), gunGrey);
+      rMuzzle.rotation.x = Math.PI / 2;
+      rMuzzle.position.set(0, 0.01, -0.52);
+      rifleMesh.add(rMuzzle);
+
+      const rGrip = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.13, 0.06), polymerMat);
+      rGrip.position.set(0, -0.09, 0.12);
+      rGrip.rotation.x = -0.32;
+      rifleMesh.add(rGrip);
+
+      const rMag = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.18, 0.07), gunGrey);
+      rMag.position.set(0, -0.11, -0.04);
+      rMag.rotation.x = 0.22;
+      rifleMesh.add(rMag);
+
+      const rTriggerGuard = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.04, 0.05), darkMetal);
+      rTriggerGuard.position.set(0, -0.06, 0.06);
+      rifleMesh.add(rTriggerGuard);
+
+      const rTrigger = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.025, 0.015), brassMat);
+      rTrigger.position.set(0, -0.055, 0.05);
+      rTrigger.rotation.x = 0.2;
+      rifleMesh.add(rTrigger);
+
+      // Rifle Tactical Flashlight
       rifleFlashlight = new THREE.Group();
-      const rFlashBody = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.14, 10), metallicMat);
+      const rFlashBody = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.14, 10), darkMetal);
       rFlashBody.rotation.x = Math.PI / 2;
       const rFlashLens = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.01, 10), new THREE.MeshBasicMaterial({ color: 0xccffff }));
       rFlashLens.rotation.x = Math.PI / 2;
       rFlashLens.position.set(0, 0, -0.071);
       rifleFlashlight.add(rFlashBody);
       rifleFlashlight.add(rFlashLens);
-      rifleFlashlight.position.set(0.048, 0.02, -0.22); // Mounted right side
+      rifleFlashlight.position.set(0.048, 0.02, -0.28);
       rifleMesh.add(rifleFlashlight);
 
       rifleLightSpot = new THREE.SpotLight(0xddf5ff, 0, 45, Math.PI / 7, 0.35, 1);
-      rifleLightSpot.position.set(0.048, 0.02, -0.28);
+      rifleLightSpot.position.set(0.048, 0.02, -0.32);
       const rifleSpotTarget = new THREE.Object3D();
-      rifleSpotTarget.position.set(0.048, 0.02, -10);
+      rifleSpotTarget.position.set(0.048, 0.02, -12);
       rifleMesh.add(rifleSpotTarget);
       rifleLightSpot.target = rifleSpotTarget;
       rifleMesh.add(rifleLightSpot);
 
       viewmodelGroup.add(rifleMesh);
 
-      // --- PISTOL ---
+      // --- PISTOL WITH RED DOT SIGHT ---
       pistolMesh = new THREE.Group();
-      const pBody = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.07, 0.25), darkMat);
-      pistolMesh.add(pBody);
 
-      const pGrip = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.12, 0.05), darkMat);
-      pGrip.position.set(0, -0.08, 0.06);
+      const pSlide = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.05, 0.26), darkMetal);
+      pSlide.position.set(0, 0.02, -0.02);
+      pistolMesh.add(pSlide);
+
+      // Pistol Red Dot Reflex Sight (Mounted on Top Slide)
+      const pSightHousing = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.025, 0.03), darkMetal);
+      pSightHousing.position.set(0, 0.062, 0.02);
+      pistolMesh.add(pSightHousing);
+      const pDotEmitter = new THREE.Mesh(new THREE.SphereGeometry(0.003, 8, 8), redDotMat);
+      pDotEmitter.position.set(0, 0.062, 0.02);
+      pistolMesh.add(pDotEmitter);
+
+      const pFrame = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.055, 0.22), polymerMat);
+      pFrame.position.set(0, -0.025, -0.01);
+      pistolMesh.add(pFrame);
+
+      const pGrip = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.12, 0.055), polymerMat);
+      pGrip.position.set(0, -0.095, 0.07);
       pGrip.rotation.x = -0.3;
       pistolMesh.add(pGrip);
 
-      // Mounted Pistol Flashlight (Underneath Barrel)
+      const pTriggerGuard = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.035, 0.045), polymerMat);
+      pTriggerGuard.position.set(0, -0.055, 0.03);
+      pistolMesh.add(pTriggerGuard);
+
+      const pTrigger = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.02, 0.012), brassMat);
+      pTrigger.position.set(0, -0.05, 0.025);
+      pTrigger.rotation.x = 0.25;
+      pistolMesh.add(pTrigger);
+
+      // Pistol Tactical Flashlight
       pistolFlashlight = new THREE.Group();
-      const pFlashBody = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.10, 10), metallicMat);
+      const pFlashBody = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.10, 10), darkMetal);
       pFlashBody.rotation.x = Math.PI / 2;
       const pFlashLens = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.01, 10), new THREE.MeshBasicMaterial({ color: 0xccffff }));
       pFlashLens.rotation.x = Math.PI / 2;
       pFlashLens.position.set(0, 0, -0.051);
       pistolFlashlight.add(pFlashBody);
       pistolFlashlight.add(pFlashLens);
-      pistolFlashlight.position.set(0, -0.05, -0.06); // Mounted underneath
+      pistolFlashlight.position.set(0, -0.06, -0.06);
       pistolMesh.add(pistolFlashlight);
 
       pistolLightSpot = new THREE.SpotLight(0xddf5ff, 0, 35, Math.PI / 6, 0.4, 1);
-      pistolLightSpot.position.set(0, -0.05, -0.12);
+      pistolLightSpot.position.set(0, -0.06, -0.12);
       const pistolSpotTarget = new THREE.Object3D();
-      pistolSpotTarget.position.set(0, -0.05, -10);
+      pistolSpotTarget.position.set(0, -0.06, -10);
       pistolMesh.add(pistolSpotTarget);
       pistolLightSpot.target = pistolSpotTarget;
       pistolMesh.add(pistolLightSpot);
@@ -874,7 +991,6 @@
       viewmodelGroup.add(pistolMesh);
       pistolMesh.visible = false;
 
-      // Initial Flashlight Visibility Off (Day Mode)
       rifleFlashlight.visible = false;
       pistolFlashlight.visible = false;
 
@@ -941,7 +1057,7 @@
           hp: 100,
           active: true,
           colorIdx: i,
-          isMovingAI: (i % 2 === 1), // Every second bot moves initially
+          isMovingAI: (i % 2 === 1),
           aiType: Math.random() > 0.5 ? 'APPROACH' : 'STRAFE',
           strafeDir: Math.random() > 0.5 ? 1 : -1,
           moveSpeed: 1.8 + Math.random() * 1.2
@@ -949,11 +1065,10 @@
       }
     }
 
-    /* --- OBJECT POOLING --- */
+    /* --- OBJECT POOLING FOR PARTICLES & AMMO --- */
     function setupObjectPools() {
       const clayGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.08, 12);
       const clayMat = new THREE.MeshStandardMaterial({ color: 0xff5500, roughness: 0.3 });
-      
       const hitSphereGeo = new THREE.SphereGeometry(0.8, 8, 8);
       const hitSphereMat = new THREE.MeshBasicMaterial({ visible: false });
 
@@ -975,22 +1090,46 @@
         shardPool.push({ mesh, active: false, vel: new THREE.Vector3(), life: 0 });
       }
 
-      const dustGeo = new THREE.SphereGeometry(0.2, 6, 6);
-      const dustMat = new THREE.MeshBasicMaterial({ color: 0xff7722, transparent: true, opacity: 0.6 });
-      for (let i = 0; i < 20; i++) {
+      // Ground Dust Impact Pool
+      const dustGeo = new THREE.SphereGeometry(0.18, 6, 6);
+      const dustMat = new THREE.MeshBasicMaterial({ color: 0x998877, transparent: true, opacity: 0.7 });
+      for (let i = 0; i < 30; i++) {
         const mesh = new THREE.Mesh(dustGeo, dustMat.clone());
         mesh.visible = false;
         scene.add(mesh);
-        dustPool.push({ mesh, active: false, vel: new THREE.Vector3(), life: 0, maxLife: 1.0 });
+        dustPool.push({ mesh, active: false, vel: new THREE.Vector3(), life: 0, maxLife: 0.45 });
       }
 
-      const crateGeo = new THREE.BoxGeometry(0.4, 0.3, 0.4);
-      const crateMat = new THREE.MeshStandardMaterial({ color: 0x33aa33, roughness: 0.5 });
-      for (let i = 0; i < 5; i++) {
-        const mesh = new THREE.Mesh(crateGeo, crateMat);
+      // Spark Impact Pool (Obstacle Hits)
+      const sparkGeo = new THREE.BoxGeometry(0.06, 0.06, 0.06);
+      const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffcc33 });
+      for (let i = 0; i < 30; i++) {
+        const mesh = new THREE.Mesh(sparkGeo, sparkMat);
         mesh.visible = false;
         scene.add(mesh);
-        ammoCratePool.push({ mesh, active: false, type: 'RIFLE' });
+        sparkPool.push({ mesh, active: false, vel: new THREE.Vector3(), life: 0, maxLife: 0.3 });
+      }
+
+      // Shootable Physics Ammo Crates
+      const crateGeo = new THREE.BoxGeometry(0.45, 0.35, 0.45);
+      const crateMat = new THREE.MeshStandardMaterial({ color: 0x33aa33, roughness: 0.5 });
+      const crateHitGeo = new THREE.BoxGeometry(0.6, 0.5, 0.6);
+      const crateHitMat = new THREE.MeshBasicMaterial({ visible: false });
+
+      for (let i = 0; i < 6; i++) {
+        const mesh = new THREE.Mesh(crateGeo, crateMat);
+        const hitBox = new THREE.Mesh(crateHitGeo, crateHitMat);
+        mesh.add(hitBox);
+        mesh.visible = false;
+        scene.add(mesh);
+        ammoCratePool.push({
+          mesh,
+          hitBox,
+          active: false,
+          type: 'RIFLE',
+          pos: new THREE.Vector3(),
+          vel: new THREE.Vector3()
+        });
       }
     }
 
@@ -1017,8 +1156,9 @@
             const last = cameraTouches.get(touch.identifier);
             const dx = touch.clientX - last.x;
             const dy = touch.clientY - last.y;
-            playerYaw -= dx * 0.004;
-            playerPitch -= dy * 0.004;
+            const sens = isADS ? 0.0018 : 0.004; // Tighter sensitivity when looking through red dot sight
+            playerYaw -= dx * sens;
+            playerPitch -= dy * sens;
             playerPitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, playerPitch));
             cameraTouches.set(touch.identifier, { x: touch.clientX, y: touch.clientY });
           }
@@ -1086,9 +1226,11 @@
       setupButton('btn-fire-left', () => { isFiring = true; }, () => { isFiring = false; });
       
       setupButton('btn-ads', () => {
-        if (isReloading) return; // Prevent toggling ADS mid-reload
+        if (isReloading) return;
         isADS = !isADS;
         document.getElementById('btn-ads').classList.toggle('active', isADS);
+        document.getElementById('crosshair').classList.toggle('hidden', isADS);
+        document.getElementById('ads-reflex-reticle').classList.toggle('active', isADS);
       });
 
       setupButton('btn-reload', () => {
@@ -1119,7 +1261,7 @@
       if (navigator.vibrate) navigator.vibrate(15);
     }
 
-    /* --- SHOOTING LOGIC --- */
+    /* --- SHOOTING & IMPACT EFFECTS --- */
     function shootWeapon() {
       const now = performance.now();
       const wData = WEAPONS[currentWeaponKey];
@@ -1166,8 +1308,26 @@
         }
       }
 
-      // 2. Check Enemy Bots
+      // 2. Check Shootable Ammo Crates
+      const activeCrates = ammoCratePool.filter(c => c.active).map(c => c.hitBox);
+      const crateHits = raycaster.intersectObjects(activeCrates);
+      if (crateHits.length > 0) {
+        const hitBox = crateHits[0].object;
+        const crateObj = ammoCratePool.find(c => c.hitBox === hitBox);
+        if (crateObj && crateObj.active) {
+          const shotDir = camera.getWorldDirection(new THREE.Vector3());
+          crateObj.vel.addScaledVector(shotDir, 4.5);
+          crateObj.vel.y += 3.0;
+          AudioEngine.playImpactSound();
+          spawnSparks(crateHits[0].point);
+          triggerHitmarker();
+          return;
+        }
+      }
+
+      // 3. Check Enemy Bots
       if (!isSkeetMode) {
+        let hitBot = false;
         for (let bot of enemyBots) {
           if (!bot.active) continue;
           const botHits = raycaster.intersectObjects(bot.mesh.children);
@@ -1175,12 +1335,69 @@
             bot.hp -= (currentWeaponKey === "RIFLE" ? 35 : 25);
             triggerHitmarker();
             AudioEngine.playBotThud();
+            spawnSparks(botHits[0].point);
 
             if (bot.hp <= 0) {
               eliminateBot(bot);
             }
+            hitBot = true;
             break;
           }
+        }
+        if (hitBot) return;
+      }
+
+      // 4. General Environment Raycast (Ground & Obstacle Hits)
+      const obstacleMeshes = scene.children.filter(m => m.geometry && m.geometry.type === 'BoxGeometry' && m !== rifleMesh && m !== pistolMesh);
+      const obsHits = raycaster.intersectObjects(obstacleMeshes);
+      if (obsHits.length > 0 && obsHits[0].distance < 80) {
+        AudioEngine.playImpactSound();
+        spawnSparks(obsHits[0].point);
+        return;
+      }
+
+      const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      const hitPoint = new THREE.Vector3();
+      if (raycaster.ray.intersectPlane(groundPlane, hitPoint)) {
+        if (hitPoint.distanceTo(camera.position) < 80) {
+          spawnDustPuff(hitPoint);
+        }
+      }
+    }
+
+    function spawnDustPuff(pos) {
+      for (let i = 0; i < 4; i++) {
+        const dust = dustPool.find(d => !d.active);
+        if (dust) {
+          dust.active = true;
+          dust.mesh.visible = true;
+          dust.mesh.position.copy(pos);
+          dust.mesh.position.y += 0.05;
+          dust.mesh.scale.set(1, 1, 1);
+          dust.vel.set(
+            (Math.random() - 0.5) * 1.5,
+            Math.random() * 1.2 + 0.5,
+            (Math.random() - 0.5) * 1.5
+          );
+          dust.life = 0;
+        }
+      }
+    }
+
+    function spawnSparks(pos) {
+      AudioEngine.playImpactSound();
+      for (let i = 0; i < 6; i++) {
+        const spark = sparkPool.find(s => !s.active);
+        if (spark) {
+          spark.active = true;
+          spark.mesh.visible = true;
+          spark.mesh.position.copy(pos);
+          spark.vel.set(
+            (Math.random() - 0.5) * 4,
+            Math.random() * 3 + 1,
+            (Math.random() - 0.5) * 4
+          );
+          spark.life = 0;
         }
       }
     }
@@ -1191,10 +1408,11 @@
 
       if (isReloading || stats.clip === wData.clipSize || stats.reserve <= 0) return;
 
-      // Automatically exit ADS mode to avoid clipping camera viewmodel
       if (isADS) {
         isADS = false;
         document.getElementById('btn-ads').classList.remove('active');
+        document.getElementById('crosshair').classList.remove('hidden');
+        document.getElementById('ads-reflex-reticle').classList.remove('active');
       }
 
       isReloading = true;
@@ -1219,7 +1437,6 @@
       document.getElementById('ammo-clip').innerText = stats.clip;
       document.getElementById('ammo-reserve').innerText = stats.reserve;
 
-      // Calculate how much ammo can be reloaded
       const needed = wData.clipSize - stats.clip;
       const reloadable = Math.min(needed, stats.reserve);
 
@@ -1314,7 +1531,7 @@
       }
     }
 
-    /* --- BOT ELIMINATION & AI SPAWNING --- */
+    /* --- BOT ELIMINATION & AMMO DROPS --- */
     function eliminateBot(bot) {
       bot.active = false;
       bot.mesh.visible = false;
@@ -1323,8 +1540,10 @@
       if (crate) {
         crate.active = true;
         crate.mesh.visible = true;
-        crate.mesh.position.copy(bot.pos);
-        crate.mesh.position.y = 0.15;
+        crate.pos.copy(bot.pos);
+        crate.pos.y = 0.2;
+        crate.mesh.position.copy(crate.pos);
+        crate.vel.set((Math.random() - 0.5) * 2, 2.5, (Math.random() - 0.5) * 2);
         crate.type = Math.random() > 0.5 ? 'RIFLE' : 'PISTOL';
       }
 
@@ -1363,19 +1582,16 @@
           if (dist > 3.0) {
             moveDir.copy(toPlayer).normalize();
           } else {
-            bot.aiType = 'STRAFE'; // Switch to strafe when close
+            bot.aiType = 'STRAFE';
           }
         } else {
-          // STRAFE AI
           const perpendicular = new THREE.Vector3(-toPlayer.z, 0, toPlayer.x).normalize();
           moveDir.copy(perpendicular).multiplyScalar(bot.strafeDir);
-          
-          if (Math.random() < 0.005) bot.strafeDir *= -1; // Random direction switch
+          if (Math.random() < 0.005) bot.strafeDir *= -1;
         }
 
         const nextPos = bot.pos.clone().addScaledVector(moveDir, bot.moveSpeed * delta);
 
-        // Simple Obstacle Collision Check for Bots
         let blocked = false;
         for (let box of mapObstacles) {
           if (
@@ -1412,7 +1628,7 @@
       document.getElementById('skeet-acc').innerText = acc + '%';
     }
 
-    /* --- MOVEMENT WITH OBSTACLE SOLID COLLISIONS --- */
+    /* --- PLAYER MOVEMENT WITH COLLISIONS --- */
     function applyPlayerMovement(delta) {
       if (moveVector.lengthSq() === 0) return;
 
@@ -1451,22 +1667,24 @@
 
       const delta = 0.016;
 
-      // 1. Player Movement
       applyPlayerMovement(delta);
 
       camera.position.copy(playerPos);
       camera.rotation.y = playerYaw;
       camera.rotation.x = playerPitch;
 
-      // 2. Enemy Bot AI Logic
+      // Smooth FOV zoom transition for ADS
+      const targetFov = isADS ? WEAPONS[currentWeaponKey].adsFov : 65;
+      currentFov += (targetFov - currentFov) * (14 * delta);
+      camera.fov = currentFov;
+      camera.updateProjectionMatrix();
+
       updateBotAI(delta);
 
-      // 3. Aim Down Sights Interpolation
       const targetWData = WEAPONS[currentWeaponKey];
       const targetPos = isADS ? targetWData.adsPos : targetWData.hipPos;
       viewmodelGroup.position.lerp(targetPos, 14 * delta);
 
-      // 4. Reload Viewmodel Motion
       if (isReloading) {
         reloadProgress += delta * 3;
         viewmodelGroup.rotation.x = Math.sin(reloadProgress * Math.PI) * 0.4;
@@ -1475,12 +1693,11 @@
         viewmodelGroup.rotation.set(0, 0, 0);
       }
 
-      // 5. Continuous Fire
       if (isFiring) {
         shootWeapon();
       }
 
-      // 6. Skeet Zone Proximity Toggle
+      // Skeet Zone Proximity Toggle
       const distToPad = playerPos.distanceTo(skeetPadPos);
       if (distToPad < 2.5 && !isSkeetMode) {
         isSkeetMode = true;
@@ -1503,7 +1720,7 @@
 
       skeetTextGroup.position.y = 2.2 + Math.sin(time * 0.003) * 0.2;
 
-      // 7. Particles Physics
+      // Clay Targets Physics
       clayPool.forEach(c => {
         if (!c.active) return;
         c.vel.y -= 9.8 * delta;
@@ -1514,6 +1731,7 @@
         }
       });
 
+      // Shards Physics
       shardPool.forEach(s => {
         if (!s.active) return;
         s.life += delta;
@@ -1529,22 +1747,66 @@
         }
       });
 
+      // Dust Puff Animation
       dustPool.forEach(d => {
         if (!d.active) return;
         d.life += delta;
         d.mesh.position.addScaledVector(d.vel, delta);
         d.mesh.scale.addScalar(delta * 1.5);
-        d.mesh.material.opacity = (1.0 - (d.life / d.maxLife)) * 0.5;
+        d.mesh.material.opacity = (1.0 - (d.life / d.maxLife)) * 0.7;
         if (d.life >= d.maxLife) {
           d.active = false;
           d.mesh.visible = false;
         }
       });
 
-      // 8. Ammo Pickups
+      // Spark Animation
+      sparkPool.forEach(s => {
+        if (!s.active) return;
+        s.life += delta;
+        s.vel.y -= 9.8 * delta;
+        s.mesh.position.addScaledVector(s.vel, delta);
+        if (s.mesh.position.y < 0) {
+          s.mesh.position.y = 0;
+          s.vel.set(0, 0, 0);
+        }
+        if (s.life >= s.maxLife) {
+          s.active = false;
+          s.mesh.visible = false;
+        }
+      });
+
+      // Shootable / Bounceable Ammo Crates Physics
       ammoCratePool.forEach(crate => {
         if (!crate.active) return;
-        crate.mesh.rotation.y += delta * 2;
+
+        crate.mesh.rotation.x += crate.vel.z * delta * 2;
+        crate.mesh.rotation.z -= crate.vel.x * delta * 2;
+
+        crate.vel.y -= 9.8 * delta;
+        crate.vel.multiplyScalar(0.96);
+        crate.pos.addScaledVector(crate.vel, delta);
+
+        if (crate.pos.y < 0.18) {
+          crate.pos.y = 0.18;
+          crate.vel.y = -crate.vel.y * 0.35;
+          crate.vel.x *= 0.8;
+          crate.vel.z *= 0.8;
+        }
+
+        for (let box of mapObstacles) {
+          if (
+            crate.pos.x + 0.3 > box.minX && crate.pos.x - 0.3 < box.maxX &&
+            crate.pos.z + 0.3 > box.minZ && crate.pos.z - 0.3 < box.maxZ &&
+            crate.pos.y < 2.5
+          ) {
+            crate.vel.x = -crate.vel.x * 0.5;
+            crate.vel.z = -crate.vel.z * 0.5;
+          }
+        }
+
+        crate.mesh.position.copy(crate.pos);
+
         if (playerPos.distanceTo(crate.mesh.position) < 1.5) {
           crate.active = false;
           crate.mesh.visible = false;
@@ -1559,7 +1821,6 @@
         }
       });
 
-      // 9. Render Mini-Map
       renderMinimap();
 
       renderer.render(scene, camera);
@@ -1602,9 +1863,6 @@
         });
       }
 
-      ammoCratePool.fileEach?.(crate => {
-        // safety check if any
-      });
       ammoCratePool.forEach(crate => {
         if (!crate.active) return;
         const crX = (crate.mesh.position.x - playerPos.x) * scale;
@@ -1643,3 +1901,4 @@
   </script>
 </body>
 </html>
+

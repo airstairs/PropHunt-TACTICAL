@@ -9,6 +9,7 @@
         android:targetSdkVersion="34" />
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <permission
         android:name="com.xthan.prophunttactical.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
@@ -28,9 +29,7 @@
         android:theme="@style/AppTheme" >
         <activity
             android:name="com.xthan.prophunttactical.MainActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden"
-            android:exported="true"
-            android:screenOrientation="landscape" >
+            android:exported="true" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

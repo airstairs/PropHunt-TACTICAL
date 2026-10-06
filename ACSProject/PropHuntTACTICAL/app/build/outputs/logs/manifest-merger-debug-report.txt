@@ -53,12 +53,16 @@ MERGED from [androidx.core:core-viewtree:1.0.0] /data/user/0/com.tom.rv2ide/file
 	xmlns:android
 		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:2:11-69
 uses-permission#android.permission.FOREGROUND_SERVICE_DATA_SYNC
-ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:3:5-4:74
+ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:4:5-87
 	android:name
-		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:4:9-71
+		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:4:22-84
+uses-permission#android.permission.VIBRATE
+ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:5:5-66
+	android:name
+		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:5:22-63
 application
-ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:5:5-22:19
-INJECTED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:5:5-22:19
+ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:7:5-22:19
+INJECTED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:7:5-22:19
 MERGED from [com.google.android.material:material:1.13.0] /data/user/0/com.tom.rv2ide/files/home/.gradle/caches/9.0.0/transforms/a8aad1d12255982d7dcd6965a6b96acf/transformed/material-1.13.0/AndroidManifest.xml:22:5-20
 MERGED from [com.google.android.material:material:1.13.0] /data/user/0/com.tom.rv2ide/files/home/.gradle/caches/9.0.0/transforms/a8aad1d12255982d7dcd6965a6b96acf/transformed/material-1.13.0/AndroidManifest.xml:22:5-20
 MERGED from [androidx.constraintlayout:constraintlayout:2.2.1] /data/user/0/com.tom.rv2ide/files/home/.gradle/caches/9.0.0/transforms/82b12c1a216e3bc67094035f89f80ec5/transformed/constraintlayout-2.2.1/AndroidManifest.xml:7:5-20
@@ -80,27 +84,23 @@ MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /data/user/
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.17.0] /data/user/0/com.tom.rv2ide/files/home/.gradle/caches/9.0.0/transforms/364a2247c064f678d92175a50b54c0f0/transformed/core-1.17.0/AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:10:9-35
+		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:12:9-35
 	android:label
-		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:8:9-41
+		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:10:9-41
 	android:roundIcon
-		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:9:9-50
+		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:11:9-50
 	android:icon
-		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:7:9-45
+		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:9:9-45
 	android:allowBackup
-		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:6:9-35
+		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:8:9-35
 	android:theme
-		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:11:9-40
+		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:13:9-40
 activity#com.xthan.prophunttactical.MainActivity
-ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:12:9-21:20
-	android:screenOrientation
-		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:15:13-50
+ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:14:9-21:20
 	android:exported
-		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:14:13-36
-	android:configChanges
-		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:16:13-74
+		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:16:13-36
 	android:name
-		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:13:13-41
+		ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:15:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
 ADDED from /storage/emulated/0/AndroidIDEProjects/PropHuntTACTICAL/app/src/main/AndroidManifest.xml:17:13-20:29
 action#android.intent.action.MAIN
